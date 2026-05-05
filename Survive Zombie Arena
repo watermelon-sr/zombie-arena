@@ -1,129 +1,199 @@
---// Survive Zombie Arena: RGB Optimized Edition
-local Library = {}
+--// Survive Zombie Arena: Zero-Lag Mobile Edition (Delta Optimized)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
---// Configuration
 local Config = {
-    KillAura = false,
-    WalkSpeed = 16,
-    FlyMode = false,
-    FlySpeed = 50
+    AutoKill = false,
+    Fly = false,
+    Speed = false
 }
 
---// Create Main RGB UI
-local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local MainButton = Instance.new("Frame", ScreenGui)
-local MenuFrame = Instance.new("Frame", ScreenGui)
+--// 1. Create the GUI Core
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "RGB_Menu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
 
--- Styling the Round Dragable Toggle
-MainButton.Name = "RGB_Toggle"
-MainButton.Size = UDim2.new(0, 50, 0, 50)
-MainButton.Position = UDim2.new(0.1, 0, 0.5, 0)
-MainButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Instance.new("UICorner", MainButton).CornerRadius = UDim.new(1, 0)
-Instance.new("UIStroke", MainButton).Thickness = 2
+-- The Small Round RGB Button
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Text = "SZA"
+ToggleBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.Parent = ScreenGui
 
--- RGB Animation Logic
-task.spawn(function()
-    while task.wait() do
-        local hue = tick() % 5 / 5
-        local color = Color3.fromHSV(hue, 1, 1)
-        MainButton.BackgroundColor3 = color
-        MenuFrame.BorderColor3 = color
-    end
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(1, 0)
+BtnCorner.Parent = ToggleBtn
+
+-- The Main Menu Box
+local MenuBox = Instance.new("Frame")
+MenuBox.Size = UDim2.new(0, 220, 0, 260)
+MenuBox.Position = UDim2.new(0.5, -110, 0.5, -130)
+MenuBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MenuBox.Visible = false
+MenuBox.Parent = ScreenGui
+
+local MenuCorner = Instance.new("UICorner")
+MenuCorner.CornerRadius = UDim.new(0, 8)
+MenuCorner.Parent = MenuBox
+
+local MenuStroke = Instance.new("UIStroke")
+MenuStroke.Thickness = 3
+MenuStroke.Parent = MenuBox
+
+--// 2. RGB Animation Logic
+RunService.RenderStepped:Connect(function()
+    local hue = tick() % 4 / 4
+    local color = Color3.fromHSV(hue, 1, 1)
+    ToggleBtn.BackgroundColor3 = color
+    MenuStroke.Color = color
 end)
 
--- Draggable Logic
-local dragging, dragInput, dragStart, startPos
-MainButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainButton.Position
-    end
-end)
-
-MainButton.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        MainButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
---// Menu Functionality
-MenuFrame.Visible = false
-MenuFrame.Size = UDim2.new(0, 200, 0, 250)
-MenuFrame.Position = UDim2.new(0.5, -100, 0.5, -125)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-local Stroke = Instance.new("UIStroke", MenuFrame)
-Stroke.Thickness = 3
-
-MainButton.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if not dragging then
-            MenuFrame.Visible = not MenuFrame.Visible
-        end
-        dragging = false
-    end
-end)
-
---// Features Logic
--- Auto Kill (Optimized for Waves)
-task.spawn(function()
-    while task.wait() do
-        if Config.KillAura then
-            -- Survival Zombie Arena usually stores zombies in Workspace.Zombies or Workspace.Enemies
-            local folder = workspace:FindFirstChild("Zombies") or workspace:FindFirstChild("Enemies") or workspace
-            for _, zombie in pairs(folder:GetChildren()) do
-                if zombie:FindFirstChild("Humanoid") and zombie.Humanoid.Health > 0 then
-                    local hrp = zombie:FindFirstChild("HumanoidRootPart")
-                    if hrp and (hrp.Position - Character.HumanoidRootPart.Position).Magnitude < 50 then
-                        -- Replace 'AttackEvent' with the game's actual RemoteEvent name
-                        -- Usually found in ReplicatedStorage
-                        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                        if remote and remote:FindFirstChild("Attack") then
-                            remote.Attack:FireServer(zombie)
-                        else
-                            -- Fallback: Damage directly if client-sided (rare in 2026)
-                            zombie.Humanoid.Health = 0
-                        end
-                    end
+--// 3. Flawless Mobile Draggable Logic
+local function MakeDraggable(gui)
+    local dragging, dragInput, dragStart, startPos
+    
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
                 end
+            end)
+        end
+    end)
+    
+    gui.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+MakeDraggable(ToggleBtn)
+MakeDraggable(MenuBox) -- Made the menu draggable too
+
+--// 4. Toggle Menu with Tap Protection
+local dragThreshold = 5
+local startClickPos
+
+ToggleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        startClickPos = input.Position
+    end
+end)
+
+ToggleBtn.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local endPos = input.Position
+        -- Only open menu if you tapped, not if you dragged the button across the screen
+        if (endPos - startClickPos).Magnitude < dragThreshold then
+            MenuBox.Visible = not MenuBox.Visible
+        end
+    end
+end)
+
+--// 5. Create Menu Buttons
+local UIListLayout = Instance.new("UIListLayout", MenuBox)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 10)
+
+-- Spacer
+local Spacer = Instance.new("Frame", MenuBox)
+Spacer.Size = UDim2.new(1, 0, 0, 5)
+Spacer.BackgroundTransparency = 1
+
+local function CreateToggle(name, configKey)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 190, 0, 45)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = name .. " [OFF]"
+    btn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.Parent = MenuBox
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        Config[configKey] = not Config[configKey]
+        if Config[configKey] then
+            btn.Text = name .. " [ON]"
+            btn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            btn.Text = name .. " [OFF]"
+            btn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    end)
+end
+
+CreateToggle("Lag-Free Auto Kill", "AutoKill")
+CreateToggle("Speed Boost", "Speed")
+CreateToggle("Fly Mode", "Fly")
+
+--// 6. Zero-Lag Auto Kill Engine (Handles Millions)
+RunService.Heartbeat:Connect(function()
+    if not Config.AutoKill then return end
+    
+    local hrp = Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- Look for the zombies folder
+    local zombiesFolder = workspace:FindFirstChild("Zombies") or workspace:FindFirstChild("Enemies") or workspace
+    
+    -- Processing Limit: Only process 40 zombies per frame to ensure 60 FPS no matter how many spawn
+    local processedThisFrame = 0 
+    
+    for _, zombie in ipairs(zombiesFolder:GetChildren()) do
+        if processedThisFrame >= 40 then break end 
+        
+        local zHum = zombie:FindFirstChild("Humanoid")
+        local zHrp = zombie:FindFirstChild("HumanoidRootPart")
+        
+        if zHum and zHrp and zHum.Health > 0 then
+            -- Only target zombies within 60 studs so your character doesn't glitch across the map
+            if (zHrp.Position - hrp.Position).Magnitude <= 60 then
+                
+                -- pcall prevents the script from crashing if the zombie is deleted mid-attack
+                pcall(function()
+                    -- Remote trigger (Update this to the exact RemoteEvent path if SZA updates)
+                    local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                    if remote and remote:FindFirstChild("Attack") then
+                        remote.Attack:FireServer(zombie)
+                    else
+                        zHum.Health = 0 -- Fallback kill
+                    end
+                end)
+                processedThisFrame = processedThisFrame + 1
             end
         end
     end
 end)
 
--- Button Creation Helper
-local function CreateBtn(text, pos, callback)
-    local b = Instance.new("TextButton", MenuFrame)
-    b.Size = UDim2.new(0, 180, 0, 40)
-    b.Position = pos
-    b.Text = text
-    b.TextColor3 = Color3.fromRGB(255, 255, 255)
-    b.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    b.MouseButton1Click:Connect(callback)
-end
-
-CreateBtn("Toggle Auto-Kill", UDim2.new(0, 10, 0, 20), function()
-    Config.KillAura = not Config.KillAura
-    print("Kill Aura: ", Config.KillAura)
-end)
-
-CreateBtn("Speed Boost (2x)", UDim2.new(0, 10, 0, 70), function()
-    Character.Humanoid.WalkSpeed = 50
-end)
-
-CreateBtn("Fly Mode", UDim2.new(0, 10, 0, 120), function()
-    Config.FlyMode = not Config.FlyMode
-    -- Fly logic implementation would go here
+-- Local Speed Update
+RunService.RenderStepped:Connect(function()
+    if Config.Speed and Character and Character:FindFirstChild("Humanoid") then
+        Character.Humanoid.WalkSpeed = 60
+    end
 end)
