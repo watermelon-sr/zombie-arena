@@ -1,95 +1,94 @@
---// REX: Survive Zombie Arena (STABLE EDITION)
+--// REX: Survive Zombie Arena - HARDCORE STABLE
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
 local Config = {
-    AutoKill = false,
+    Kill = false,
     Fly = false,
-    Speed = false,
-    FlySpeed = 50
+    Speed = false
 }
 
---// 1. GUI Setup (Smaller REX Menu)
+--// GUI CORE (Small RGB Draggable)
 local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
-local MenuBox = Instance.new("Frame", ScreenGui)
+local MainBtn = Instance.new("TextButton", ScreenGui)
+local Menu = Instance.new("Frame", ScreenGui)
 
-ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
-ToggleBtn.Text = "REX"
-ToggleBtn.BackgroundColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+MainBtn.Size = UDim2.new(0, 50, 0, 50)
+MainBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
+MainBtn.Text = "REX"
+MainBtn.BackgroundColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(1, 0)
+local Stroke = Instance.new("UIStroke", MainBtn)
+Stroke.Thickness = 3
 
-MenuBox.Size = UDim2.new(0, 160, 0, 180)
-MenuBox.Position = UDim2.new(0.5, -80, 0.5, -90)
-MenuBox.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MenuBox.Visible = false
-local Stroke = Instance.new("UIStroke", MenuBox)
-Stroke.Thickness = 2
+Menu.Size = UDim2.new(0, 150, 0, 160)
+Menu.Position = UDim2.new(0.5, -75, 0.5, -80)
+Menu.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Menu.Visible = false
+local MStroke = Instance.new("UIStroke", Menu)
+MStroke.Thickness = 2
 
--- RGB Animation
+-- RGB Logic
 task.spawn(function()
     while task.wait() do
-        local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        ToggleBtn.BackgroundColor3 = color
-        Stroke.Color = color
+        local c = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+        Stroke.Color = c
+        MStroke.Color = c
     end
 end)
 
--- Draggable & Toggle Fix
-local function MakeDraggable(obj)
-    local dragging, inputStart, startPos
-    obj.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            inputStart = input.Position
-            startPos = obj.Position
+-- Draggable logic
+local function Drag(obj)
+    local drag, start, pos
+    obj.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            drag = true; start = i.Position; pos = obj.Position
         end
     end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType.Touch) then
-            local delta = input.Position - inputStart
-            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    UIS.InputChanged:Connect(function(i)
+        if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType.Touch) then
+            local d = i.Position - start
+            obj.Position = UDim2.new(pos.X.Scale, pos.X.Offset + d.X, pos.Y.Scale, pos.Y.Offset + d.Y)
         end
     end)
-    obj.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if (input.Position - (inputStart or input.Position)).Magnitude < 5 then
-                if obj == ToggleBtn then MenuBox.Visible = not MenuBox.Visible end
+    obj.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            drag = false
+            if (i.Position - (start or i.Position)).Magnitude < 5 then
+                if obj == MainBtn then Menu.Visible = not Menu.Visible end
             end
-            dragging = false
         end
     end)
 end
-MakeDraggable(ToggleBtn)
-MakeDraggable(MenuBox)
+Drag(MainBtn)
 
---// 2. The Features (REWRITTEN)
-
--- AUTO KILL (Wave 999+ Optimized)
-task.spawn(function()
-    while task.wait(0.1) do
-        if Config.AutoKill then
-            local char = LocalPlayer.Character
-            local gun = char and char:FindFirstChildOfClass("Tool")
-            if gun then
-                -- Search for zombies in all common folders
-                local targets = workspace:FindFirstChild("Zombies") or workspace:FindFirstChild("NPCs") or workspace
-                for _, v in pairs(targets:GetChildren()) do
-                    if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v ~= char then
-                        local root = v:FindFirstChild("HumanoidRootPart")
-                        if root and (root.Position - char.HumanoidRootPart.Position).Magnitude < 150 then
-                            -- Auto-Damage Remote Trigger (Standard for SZA)
-                            local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Shoot") or game:GetService("ReplicatedStorage"):FindFirstChild("Damage")
-                            if remote then
-                                remote:FireServer(v.Humanoid, root.Position)
-                            else
-                                -- Direct Damage Fallback
-                                v.Humanoid:TakeDamage(100) 
+--// THE UNSTOPPABLE AUTO-KILL
+-- Optimized for Hardcore Mode
+RunService.Stepped:Connect(function()
+    if Config.Kill then
+        local char = LocalPlayer.Character
+        local tool = char and char:FindFirstChildOfClass("Tool")
+        
+        -- Script only runs if you are holding a gun (like the Pistol in your screenshot)
+        if tool then
+            -- Scan Workspace for anything with a Humanoid
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("Humanoid") and v.Parent ~= char and v.Health > 0 then
+                    local root = v.Parent:FindFirstChild("HumanoidRootPart")
+                    if root and (root.Position - char.HumanoidRootPart.Position).Magnitude < 100 then
+                        -- Fire the gun's attack remote directly
+                        local remote = tool:FindFirstChild("RemoteEvent") or tool:FindFirstChild("Shoot") or game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                        pcall(function()
+                            if remote:IsA("RemoteEvent") then
+                                remote:FireServer(v, root.Position)
+                            elseif type(remote) == "table" then
+                                remote.Attack:FireServer(v)
                             end
-                        end
+                            -- Instant Kill Backup
+                            v.Health = 0
+                        end)
                     end
                 end
             end
@@ -97,51 +96,42 @@ task.spawn(function()
     end
 end)
 
--- FLY MODE FIX
-local bv, bg
+-- FLY & SPEED
+local bv
 RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    if Config.Fly and char and char:FindFirstChild("HumanoidRootPart") then
+    local c = LocalPlayer.Character
+    if Config.Fly and c and c:FindFirstChild("HumanoidRootPart") then
         if not bv then
-            bv = Instance.new("BodyVelocity", char.HumanoidRootPart)
+            bv = Instance.new("BodyVelocity", c.HumanoidRootPart)
             bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-            bg = Instance.new("BodyGyro", char.HumanoidRootPart)
-            bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
         end
-        bv.Velocity = char.Humanoid.MoveDirection * Config.FlySpeed
-        bg.CFrame = workspace.CurrentCamera.CFrame
+        bv.Velocity = workspace.CurrentCamera.CFrame.LookVector * 100
     else
         if bv then bv:Destroy() bv = nil end
-        if bg then bg:Destroy() bg = nil end
+    end
+    
+    if Config.Speed and c and c:FindFirstChild("Humanoid") then
+        c.Humanoid.WalkSpeed = 100
+    elseif not Config.Speed and c and c:FindFirstChild("Humanoid") then
+        c.Humanoid.WalkSpeed = 16
     end
 end)
 
---// 3. Buttons
-local function CreateButton(txt, conf)
-    local b = Instance.new("TextButton", MenuBox)
-    b.Size = UDim2.new(0, 140, 0, 35)
-    b.Position = UDim2.new(0, 10, 0, (#MenuBox:GetChildren() - 3) * 40 + 10)
+-- Buttons
+local function Add(txt, key)
+    local b = Instance.new("TextButton", Menu)
+    b.Size = UDim2.new(1, -20, 0, 35)
+    b.Position = UDim2.new(0, 10, 0, (#Menu:GetChildren()-3) * 40 + 10)
     b.Text = txt .. ": OFF"
+    b.TextColor3 = Color3.new(1,0,0)
     b.BackgroundColor3 = Color3.fromRGB(30,30,30)
-    b.TextColor3 = Color3.new(1,1,1)
     b.MouseButton1Click:Connect(function()
-        Config[conf] = not Config[conf]
-        b.Text = txt .. (Config[conf] and ": ON" or ": OFF")
-        b.TextColor3 = Config[conf] and Color3.new(0,1,0) or Color3.new(1,0,0)
-        
-        -- Reset Speed if turned off
-        if conf == "Speed" and not Config[conf] then
-            LocalPlayer.Character.Humanoid.WalkSpeed = 16
-        end
+        Config[key] = not Config[key]
+        b.Text = txt .. (Config[key] and ": ON" or ": OFF")
+        b.TextColor3 = Config[key] and Color3.new(0,1,0) or Color3.new(1,0,0)
     end)
 end
 
-CreateButton("AutoKill", "AutoKill")
-CreateButton("Fly", "Fly")
-CreateButton("Speed", "Speed")
-
-RunService.RenderStepped:Connect(function()
-    if Config.Speed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = 80
-    end
-end)
+Add("Auto Kill", "Kill")
+Add("Fly", "Fly")
+Add("Speed", "Speed")
