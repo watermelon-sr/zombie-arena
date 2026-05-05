@@ -1,0 +1,129 @@
+--// Survive Zombie Arena: RGB Optimized Edition
+local Library = {}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+--// Configuration
+local Config = {
+    KillAura = false,
+    WalkSpeed = 16,
+    FlyMode = false,
+    FlySpeed = 50
+}
+
+--// Create Main RGB UI
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local MainButton = Instance.new("Frame", ScreenGui)
+local MenuFrame = Instance.new("Frame", ScreenGui)
+
+-- Styling the Round Dragable Toggle
+MainButton.Name = "RGB_Toggle"
+MainButton.Size = UDim2.new(0, 50, 0, 50)
+MainButton.Position = UDim2.new(0.1, 0, 0.5, 0)
+MainButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", MainButton).CornerRadius = UDim.new(1, 0)
+Instance.new("UIStroke", MainButton).Thickness = 2
+
+-- RGB Animation Logic
+task.spawn(function()
+    while task.wait() do
+        local hue = tick() % 5 / 5
+        local color = Color3.fromHSV(hue, 1, 1)
+        MainButton.BackgroundColor3 = color
+        MenuFrame.BorderColor3 = color
+    end
+end)
+
+-- Draggable Logic
+local dragging, dragInput, dragStart, startPos
+MainButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainButton.Position
+    end
+end)
+
+MainButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+--// Menu Functionality
+MenuFrame.Visible = false
+MenuFrame.Size = UDim2.new(0, 200, 0, 250)
+MenuFrame.Position = UDim2.new(0.5, -100, 0.5, -125)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+local Stroke = Instance.new("UIStroke", MenuFrame)
+Stroke.Thickness = 3
+
+MainButton.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if not dragging then
+            MenuFrame.Visible = not MenuFrame.Visible
+        end
+        dragging = false
+    end
+end)
+
+--// Features Logic
+-- Auto Kill (Optimized for Waves)
+task.spawn(function()
+    while task.wait() do
+        if Config.KillAura then
+            -- Survival Zombie Arena usually stores zombies in Workspace.Zombies or Workspace.Enemies
+            local folder = workspace:FindFirstChild("Zombies") or workspace:FindFirstChild("Enemies") or workspace
+            for _, zombie in pairs(folder:GetChildren()) do
+                if zombie:FindFirstChild("Humanoid") and zombie.Humanoid.Health > 0 then
+                    local hrp = zombie:FindFirstChild("HumanoidRootPart")
+                    if hrp and (hrp.Position - Character.HumanoidRootPart.Position).Magnitude < 50 then
+                        -- Replace 'AttackEvent' with the game's actual RemoteEvent name
+                        -- Usually found in ReplicatedStorage
+                        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                        if remote and remote:FindFirstChild("Attack") then
+                            remote.Attack:FireServer(zombie)
+                        else
+                            -- Fallback: Damage directly if client-sided (rare in 2026)
+                            zombie.Humanoid.Health = 0
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Button Creation Helper
+local function CreateBtn(text, pos, callback)
+    local b = Instance.new("TextButton", MenuFrame)
+    b.Size = UDim2.new(0, 180, 0, 40)
+    b.Position = pos
+    b.Text = text
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    b.MouseButton1Click:Connect(callback)
+end
+
+CreateBtn("Toggle Auto-Kill", UDim2.new(0, 10, 0, 20), function()
+    Config.KillAura = not Config.KillAura
+    print("Kill Aura: ", Config.KillAura)
+end)
+
+CreateBtn("Speed Boost (2x)", UDim2.new(0, 10, 0, 70), function()
+    Character.Humanoid.WalkSpeed = 50
+end)
+
+CreateBtn("Fly Mode", UDim2.new(0, 10, 0, 120), function()
+    Config.FlyMode = not Config.FlyMode
+    -- Fly logic implementation would go here
+end)
